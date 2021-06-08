@@ -54,3 +54,12 @@
 
 #### Using best 10 validation epochs
 * By default, stage 5 decoding averages the model parameters saved from the last 10 training epochs. To instead average the model parameters saved from the training epochs with best 10 validation scores, please add `--use_valbest_average true`.
+
+#### Posterior Ensemble Decoding
+* Stage 6 performs decoding using a posterior ensembling of specified input models. Note that by default, the `--ensembletag` variable is set to `ensemble`. So to avoid any over-writing files, specify it appropriately.
+  
+  ```bash
+  ./run.sh --stage 6 --stop_stage 6 --lmtag my_rnnlm \
+      --ensembletag last10_val10_ensemble \
+      --ensemble_models "<expdir>/results/path_to_model.last10.avg.best <expdir>/results/path_to_model.val10.avg.best"
+  ```

@@ -36,6 +36,8 @@ recog_model=model.acc.best # set a model to be used for decoding: 'model.acc.bes
 n_average=10
 use_valbest_average=false
 use_custom_model=""
+ensemble_models=""
+ensembletag="ensemble"
 
 lang=en # en de fr cy tt kab ca zh-TW it fa eu es ru tr nl eo zh-CN rw pt zh-HK cs pl uk 
 
@@ -304,6 +306,47 @@ if [ ${stage} -le 5 ] && [ ${stop_stage} -ge 5 ]; then
             --recog-json ${feat_recog_dir}/split${nj}utt/data.JOB.json \
             --result-label ${expdir}/${decode_dir}/data.JOB.json \
             --model ${expdir}/results/${recog_model}  \
+            --rnnlm ${lmexpdir}/rnnlm.model.best
+
+        # score_sclite.sh --bpe ${nbpe} --bpemodel ${bpemodel}.model --wer true ${expdir}/${decode_dir} ${dict}
+        score_sclite.sh --wer true ${expdir}/${decode_dir} ${dict}
+        python local/evaluate_decoded_captions.py ${expdir}/${decode_dir}/data.json \
+            data/${rtask}/groundtruth_captions.txt > "${expdir}/${decode_dir}/caption_evaluation_summary.txt"
+        echo "Evaluation metrics summary is saved to: ${expdir}/${decode_dir}/caption_evaluation_summary.txt"
+        echo "Evaluation metrics individual results are saved to: ${expdir}/${decode_dir}/caption_evaluation_results.txt"
+
+    ) &
+    pids+=($!) # store background pids
+    done
+    i=0; for pid in "${pids[@]}"; do wait ${pid} || ((++i)); done
+    [ ${i} -gt 0 ] && echo "$0: ${i} background jobs are failed." && false
+    echo "Finished"
+fi
+
+if [ ${stage} -le 6 ] && [ ${stop_stage} -ge 6 ]; then
+    echo "stage 6: Emsemble Decoding"
+    nj=12
+    pids=() # initialize pids
+    for rtask in ${recog_set}; do
+    (
+        decode_dir=decode_${rtask}_$(basename ${decode_config%.*})_${lmtag}_${ensembletag}
+        feat_recog_dir=${dumpdir}/${rtask}/delta${do_delta}
+
+        # split data
+        splitjson.py --parts ${nj} ${feat_recog_dir}/data.json
+
+        #### use CPU for decoding
+        ngpu=0
+
+        ${decode_cmd} JOB=1:${nj} ${expdir}/${decode_dir}/log/decode.JOB.log \
+            asr_recog.py \
+            --config ${decode_config} \
+            --ngpu ${ngpu} \
+            --backend ${backend} \
+            --batchsize 0 \
+            --recog-json ${feat_recog_dir}/split${nj}utt/data.JOB.json \
+            --result-label ${expdir}/${decode_dir}/data.JOB.json \
+            --model $(echo "${ensemble_models}" | xargs | sed 's/ / --model /') \
             --rnnlm ${lmexpdir}/rnnlm.model.best
 
         # score_sclite.sh --bpe ${nbpe} --bpemodel ${bpemodel}.model --wer true ${expdir}/${decode_dir} ${dict}

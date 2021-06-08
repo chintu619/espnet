@@ -1,13 +1,13 @@
 # Clotho Recipe
 
 ## Data preparation
-* Data preparation during `stage 0` can be performed by appropriately setting the boolean variables in below command. By default, all variables are set to `false`. Description of each variable is also detailed below.
+* Data preparation during `stage 0` can be performed by appropriately setting the boolean variables in below command. By default, all variables are set to `false` except for `--augment_audiocaps` which is set to `true`. Description of each variable is also detailed below.
   
   ```bash
   ./run.sh --stage 0 --stop_stage 0  \
            --download_clothov2 true  \
-           --download_audiocaps false \
-           --augment_audiocaps false  \
+           --download_audiocaps true \
+           --augment_audiocaps true  \
            --augment_speedperturbation false \
            --download_evalmetrics true
   ```
@@ -54,3 +54,12 @@
 
 #### Using best 10 validation epochs
 * By default, stage 5 decoding averages the model parameters saved from the last 10 training epochs. To instead average the model parameters saved from the training epochs with best 10 validation scores, please add `--use_valbest_average true`.
+
+#### Posterior Ensemble Decoding
+* Stage 6 performs decoding using a posterior ensembling of specified input models. Note that by default, the `--ensembletag` variable is set to `ensemble`. So to avoid any over-writing files, specify it appropriately.
+  
+  ```bash
+  ./run.sh --stage 6 --stop_stage 6 --lmtag my_rnnlm \
+      --ensembletag last10_val10_ensemble \
+      --ensemble_models "<expdir>/results/path_to_model.last10.avg.best <expdir>/results/path_to_model.val10.avg.best"
+  ```

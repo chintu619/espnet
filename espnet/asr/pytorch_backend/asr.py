@@ -34,6 +34,7 @@ from espnet.asr.pytorch_backend.asr_init import freeze_modules
 from espnet.asr.pytorch_backend.asr_init import load_trained_model
 from espnet.asr.pytorch_backend.asr_init import load_trained_modules
 import espnet.lm.pytorch_backend.extlm as extlm_pytorch
+from espnet.nets.pytorch_backend.e2e_asr_ensemble import E2E as EnsembleE2E
 from espnet.nets.asr_interface import ASRInterface
 from espnet.nets.beam_search_transducer import BeamSearchTransducer
 from espnet.nets.pytorch_backend.e2e_asr import pad_list
@@ -909,9 +910,16 @@ def recog(args):
 
     """
     set_deterministic_pytorch(args)
-    model, train_args = load_trained_model(args.model, training=False)
-    assert isinstance(model, ASRInterface)
-    model.recog_args = args
+    model_list = []
+    if not isinstance(args.model, list):
+        args.model = [args.model]
+    for m in args.model:
+        logging.info("ensemble decoding: add model " + str(m))
+        model, train_args = load_trained_model(m, training=False)
+        assert isinstance(model, ASRInterface)
+        model.trans_args = args
+        model_list.append(model)
+    model = EnsembleE2E(model_list)
 
     if args.streaming_mode and "transformer" in train_args.model_module:
         raise NotImplementedError("streaming mode for transformer is not implemented")
