@@ -61,5 +61,5 @@
   ```bash
   ./run.sh --stage 6 --stop_stage 6 --lmtag my_rnnlm \
       --ensembletag last10_val10_ensemble \
-      --ensemble_models "<expdir>/results/path_to_model.last10.avg.best <expdir>/results/path_to_model.val10.avg.best"
+      --ensemble_models "<expdir>/results/model.last10.avg.best <expdir>/results/model.val10.avg.best"
   ```
