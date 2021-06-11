@@ -91,7 +91,7 @@ def get_parser():
     )
     # model (parameter) related
     parser.add_argument(
-        "--model", type=str, required=True, help="Model file parameters to read"
+        "--model", type=str, required=True, help="Model file parameters to read", action="append"
     )
     parser.add_argument(
         "--model-conf", type=str, default=None, help="Model config file"
