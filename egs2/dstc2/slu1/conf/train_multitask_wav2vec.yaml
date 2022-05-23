@@ -29,12 +29,12 @@ decoder_conf:
   src_attention_dropout_rate: 0.1
 
 batch_type: folded
-batch_size: 60
+batch_size: 30
 
 optim: adam
 optim_conf:
   lr: 0.0004
-scheduler: warmuplr   # pytorch v1.1.0+ required #Tune warmup steps
+scheduler: warmuplr
 scheduler_conf:
   warmup_steps: 25000
 max_epoch: 70
@@ -60,7 +60,7 @@ preencoder_conf:
   output_size: 80
 
 model_conf:
-  ctc_weight: [0.3, 0.0]
+  ctc_weight: [0.3, 0.3]
   lsm_weight: 0.1
   length_normalized_loss: false
   extract_feats_in_collect_stats: false  # Note: "False" means during collect stats (stage 10), generating dummy stats files rather than extract_feats by forward frontend.

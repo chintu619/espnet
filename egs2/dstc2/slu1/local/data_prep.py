@@ -37,7 +37,7 @@ for x in dir_dict:
         for row in transcript_df.values:
             words = (
                 " <sep> ".join(sorted(eval(row[5])))
-                + " <utt> "
+                + " <task_sep> "
                 + row[2].replace("<unk>", "unk").encode("ascii", "ignore").decode()
             )
             path_arr = row[4].split("/")

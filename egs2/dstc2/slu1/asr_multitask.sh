@@ -111,6 +111,8 @@ k2_config=./conf/decode_asr_transformer_with_k2.yaml
 
 use_streaming=false # Whether to use streaming decoding
 
+use_maskctc=false # Whether to use maskctc decoding
+
 batch_size=1
 inference_tag=    # Suffix to the result dir for decoding.
 inference_config= # Config for decoding.
@@ -143,7 +145,6 @@ local_score_opts=          # The options given to local/score.sh.
 asr_speech_fold_length=800 # fold_length for speech data during ASR training.
 asr_text_fold_length=150   # fold_length for text data during ASR training.
 lm_fold_length=150         # fold_length for LM training.
-sym_tasksep="<task_sep>"   # symbol used as a separator between the multitask text
 
 help_message=$(cat << EOF
 Usage: $0 --train-set "<train_set_name>" --valid-set "<valid_set_name>" --test_sets "<test_set_names>"
@@ -227,6 +228,7 @@ Options:
     --inference_asr_model # ASR model path for decoding (default="${inference_asr_model}").
     --download_model      # Download a model from Model Zoo and use it for decoding (default="${download_model}").
     --use_streaming       # Whether to use streaming decoding (default="${use_streaming}").
+    --use_maskctc         # Whether to use maskctc decoding (default="${use_streaming}").
 
     # [Task dependent] Set the datadir name created by local/data.sh
     --train_set     # Name of training set (required).
@@ -669,12 +671,6 @@ if ! "${skip_data_prep}"; then
             log "Stage 5: Generate character level token_list from ${lm_train_text}"
 
             _opts="--non_linguistic_symbols ${nlsyms_txt}"
-            
-            # NOTE(chai): remove hyphen from text files
-            for dset in "${train_set}" "${valid_set}"; do
-                local/remove_hyphen.py ${data_feats}/${dset}/text
-            done
-            local/remove_hyphen.py "${data_feats}/lm_train.txt"
 
             # The first symbol in token_list must be "<blank>" and the last must be also sos/eos:
             # 0 is reserved for CTC-blank for ASR and also used as ignore-index in the other task
@@ -761,7 +757,7 @@ if ! "${skip_train}"; then
             log "LM collect-stats started... log: '${_logdir}/stats.*.log'"
             # NOTE: --*_shape_file doesn't require length information if --batch_type=unsorted,
             #       but it's used only for deciding the sample ids.
-            # shellcheck disable=SC2086
+            # shellcheck disable=SC2046,SC2086
             ${train_cmd} JOB=1:"${_nj}" "${_logdir}"/stats.JOB.log \
                 ${python} -m espnet2.bin.lm_train \
                     --collect_stats true \
@@ -777,7 +773,7 @@ if ! "${skip_train}"; then
                     --train_shape_file "${_logdir}/train.JOB.scp" \
                     --valid_shape_file "${_logdir}/dev.JOB.scp" \
                     --output_dir "${_logdir}/stats.JOB" \
-                    ${_opts} ${lm_args} || { cat "${_logdir}"/stats.1.log; exit 1; }
+                    ${_opts} ${lm_args} || { cat $(grep -l -i error "${_logdir}"/stats.*.log) ; exit 1; }
 
             # 4. Aggregate shape files
             _opts=
@@ -904,7 +900,7 @@ if ! "${skip_train}"; then
         if "${use_ngram}"; then
             log "Stage 9: Ngram Training: train_set=${data_feats}/lm_train.txt"
             cut -f 2- -d " " ${data_feats}/lm_train.txt | lmplz -S "20%" --discount_fallback -o ${ngram_num} - >${ngram_exp}/${ngram_num}gram.arpa
-            build_binary -s ${ngram_exp}/${ngram_num}gram.arpa ${ngram_exp}/${ngram_num}gram.bin 
+            build_binary -s ${ngram_exp}/${ngram_num}gram.arpa ${ngram_exp}/${ngram_num}gram.bin
         else
             log "Stage 9: Skip ngram stages: use_ngram=${use_ngram}"
         fi
@@ -914,7 +910,6 @@ if ! "${skip_train}"; then
     if [ ${stage} -le 10 ] && [ ${stop_stage} -ge 10 ]; then
         _asr_train_dir="${data_feats}/${train_set}"
         _asr_valid_dir="${data_feats}/${valid_set}"
-        
         log "Stage 10: ASR collect stats: train_set=${_asr_train_dir}, valid_set=${_asr_valid_dir}"
 
         _opts=
@@ -963,22 +958,19 @@ if ! "${skip_train}"; then
         done
         # shellcheck disable=SC2086
         utils/split_scp.pl "${key_file}" ${split_scps}
-
-        # 2. Split the concatenated multitask text using specified ${sym_tasksep}
+        
+        # Split the concatenated multitask text
         for dset in "${train_set}" "${valid_set}"; do
-            local/split_multitask_text.py ${data_feats}/${dset}/text ${num_decoders} "<utt>"
+            local/split_multitask_text.py ${data_feats}/${dset}/text ${num_decoders} "<task_sep>"
         done
 
-        # 3. Generate run.sh
+        # 2. Generate run.sh
         log "Generate '${asr_stats_dir}/run.sh'. You can resume the process from stage 10 using this script"
         mkdir -p "${asr_stats_dir}"; echo "${run_args} --stage 10 \"\$@\"; exit \$?" > "${asr_stats_dir}/run.sh"; chmod +x "${asr_stats_dir}/run.sh"
 
-        # 4. Submit jobs
+        # 3. Submit jobs
         log "ASR collect-stats started... log: '${_logdir}/stats.*.log'"
 
-        # NOTE: --*_shape_file doesn't require length information if --batch_type=unsorted,
-        #       but it's used only for deciding the sample ids.
-        
         _train_data_path_and_name_and_type_opts=
         _valid_data_path_and_name_and_type_opts=
         for i in $(seq "${num_decoders}"); do
@@ -987,7 +979,11 @@ if ! "${skip_train}"; then
             _valid_data_path_and_name_and_type_opts+="--valid_data_path_and_name_and_type "
             _valid_data_path_and_name_and_type_opts+="${_asr_valid_dir}/text_task${i},text_task${i},text "
         done
-        # shellcheck disable=SC2086
+
+        # NOTE: --*_shape_file doesn't require length information if --batch_type=unsorted,
+        #       but it's used only for deciding the sample ids.
+
+        # shellcheck disable=SC2046,SC2086
         ${train_cmd} JOB=1:"${_nj}" "${_logdir}"/stats.JOB.log \
             ${python} -m espnet2.bin.asr_multitask_train \
                 --collect_stats true \
@@ -1006,7 +1002,7 @@ if ! "${skip_train}"; then
                 --train_shape_file "${_logdir}/train.JOB.scp" \
                 --valid_shape_file "${_logdir}/valid.JOB.scp" \
                 --output_dir "${_logdir}/stats.JOB" \
-                ${_opts} ${asr_args} || { cat "${_logdir}"/stats.1.log; exit 1; }
+                ${_opts} ${asr_args} || { cat $(grep -l -i error "${_logdir}"/stats.*.log) ; exit 1; }
 
         # 4. Aggregate shape files
         _opts=
@@ -1091,7 +1087,7 @@ if ! "${skip_train}"; then
             else
                 log "${_split_dir}/.done exists. Spliting is skipped"
             fi
-            
+
             _train_data_path_and_name_and_type_opts=
             _train_shape_file_opts=
             for i in $(seq "${num_decoders}"); do
@@ -1251,6 +1247,8 @@ if ! "${skip_eval}"; then
         else
           if "${use_streaming}"; then
               asr_inference_tool="espnet2.bin.asr_inference_streaming"
+          elif "${use_maskctc}"; then
+              asr_inference_tool="espnet2.bin.asr_inference_maskctc"
           else
               asr_inference_tool="espnet2.bin.asr_multitask_inference"
           fi
@@ -1293,10 +1291,9 @@ if ! "${skip_eval}"; then
 
             # 2. Submit decoding jobs
             log "Decoding started... log: '${_logdir}/asr_inference.*.log'"
-            # shellcheck disable=SC2086
+            # shellcheck disable=SC2046,SC2086
             ${_cmd} --gpu "${_ngpu}" JOB=1:"${_nj}" "${_logdir}"/asr_inference.JOB.log \
                 ${python} -m ${asr_inference_tool} \
-                    --sym_tasksep "\"<utt>\"" \
                     --batch_size ${batch_size} \
                     --ngpu "${_ngpu}" \
                     --data_path_and_name_and_type "${_data}/${_scp},speech,${_type}" \
@@ -1304,7 +1301,7 @@ if ! "${skip_eval}"; then
                     --asr_train_config "${asr_exp}"/config.yaml \
                     --asr_model_file "${asr_exp}"/"${inference_asr_model}" \
                     --output_dir "${_logdir}"/output.JOB \
-                    ${_opts} ${inference_args}
+                    ${_opts} ${inference_args} || { cat $(grep -l -i error "${_logdir}"/asr_inference.*.log) ; exit 1; }
 
             # 3. Concatenates the output files from each jobs
             for f in token token_int score text; do
@@ -1319,10 +1316,6 @@ if ! "${skip_eval}"; then
 
 
     if [ ${stage} -le 13 ] && [ ${stop_stage} -ge 13 ]; then
-        if [ ! -d "${asr_exp}/${inference_tag}/valid" ]; then
-            cp -r exp/asr_train_multitask_wav2vec_raw_en_word/decode_asr_asr_model_valid.acc.ave/valid \
-                "${asr_exp}/${inference_tag}/"
-        fi
         log "Stage 13: Scoring"
         if [ "${token_type}" = phn ]; then
             log "Error: Not implemented for token_type=phn"

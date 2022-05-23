@@ -7,7 +7,6 @@ def parse_arguments():
     parser.add_argument('text_filepath', type=str, help="filepath to multitask text file")
     parser.add_argument('num_splits', type=int, help="number of splits made from text file")
     parser.add_argument('token_split', type=str, help="token used to split text from multiple tasks")
-    parser.add_argument('--token_sep', type=str, default="", help="separator token within a task's text (will be removed)")
     return parser.parse_args()
 
 def main(args):
@@ -22,7 +21,7 @@ def main(args):
         assert len(texts) == args.num_splits, print(f"{args.token_split} does not split the line:{ix+1} " + 
                                                     f"in text file into {args.num_splits} parts", line)
         for i in range(args.num_splits):
-            text = texts.pop(-1).replace(args.token_sep, "")
+            text = texts.pop()
             files_write[i].write(f"{key} {' '.join(text.split())}\n")
     return
 
