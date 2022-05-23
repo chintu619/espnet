@@ -30,16 +30,16 @@ def get_classification_result(hyp_file, ref_file, hyp_write, ref_write):
     for line_count in range(len(hyp_lines)):
         hyp_line = " ".join(hyp_lines[line_count].split()[:-1]).replace("<sos/eos>","").replace("-"," ")
         ref_line = " ".join(ref_lines[line_count].split()[:-1]).replace("-"," ")
-        hyp_dialog_acts = remove_spaces(hyp_line.split("<utt>")[0].split("<sep>"))
-        ref_dialog_acts = remove_spaces(ref_line.split("<utt>")[0].split("<sep>"))
+        hyp_dialog_acts = remove_spaces(hyp_line.split("<task_sep>")[0].split("<sep>"))
+        ref_dialog_acts = remove_spaces(ref_line.split("<task_sep>")[0].split("<sep>"))
         hyp_dialog_acts_list.append(hyp_dialog_acts)
         ref_dialog_acts_list.append(ref_dialog_acts)
         # print(hyp_dialog_acts,ref_dialog_acts)
         if set(hyp_dialog_acts) != set(ref_dialog_acts):
             error += 1
             # print("hyp:", hyp_dialog_acts, "ref:", ref_dialog_acts)
-        hyp_write.write(" ".join(hyp_lines[line_count].split("<utt> ")[1:]))
-        ref_write.write(" ".join(ref_lines[line_count].split("<utt> ")[1:]))
+        hyp_write.write(" ".join(hyp_lines[line_count].split("<task_sep> ")[1:]))
+        ref_write.write(" ".join(ref_lines[line_count].split("<task_sep> ")[1:]))
     mlb.fit(ref_dialog_acts_list)
     hyp_dialog_acts_binary = mlb.transform(hyp_dialog_acts_list)
     ref_dialog_acts_binary = mlb.transform(ref_dialog_acts_list)
