@@ -3,9 +3,15 @@ import glob
 import json
 import pandas as pd
 import shutil
+import sys
+
+if len(sys.argv) != 2:
+    print("Usage: python create_dataset.py [download_path]")
+    sys.exit(1)
+dstc2_root = sys.argv[1]
+os.chdir(dstc2_root)
 
 ###### DOWNLOAD DATASET
-import os
 
 audio_urls = {
     "audio_Apr11_S0": "https://github.com/matthen/dstc/releases/download/v1/audio_Apr11_S0.tar.gz",

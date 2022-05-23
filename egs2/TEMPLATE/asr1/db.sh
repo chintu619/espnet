@@ -178,6 +178,7 @@ if [[ "$(hostname)" == tir* ]]; then
     FISHER_CALLHOME_SPANISH=/projects/tir5/data/speech_corpora/fisher_callhome_spanish
     DSING=/projects/tir5/data/speech_corpora/sing_300x30x2
     MS_INDIC_IS18=/projects/tir6/general/cnariset/corpora/microsoft_speech_corpus_indian_languages
+    DSTC2=/projects/tir5/data/speech_corpora/DSTC2
 fi
 
 # For only JHU environment

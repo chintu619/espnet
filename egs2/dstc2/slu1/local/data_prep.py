@@ -25,8 +25,6 @@ for x in dir_dict:
     with open(os.path.join("data", x, "text"), "w") as text_f, open(
         os.path.join("data", x, "wav.scp"), "w"
     ) as wav_scp_f, open(
-        os.path.join("data", x, "transcript"), "w"
-    ) as transcript_f, open(
         os.path.join("data", x, "utt2spk"), "w"
     ) as utt2spk_f:
 
@@ -42,7 +40,7 @@ for x in dir_dict:
             )
             path_arr = row[4].split("/")
             utt_id = path_arr[-2] + "_" + path_arr[-1]
-            speaker_id = path_arr[-2]
+            speaker_id = path_arr[-1].split("voip-")[1].split("_pt344x")[0].replace("-", "_")
             text_f.write(utt_id + " " + words + "\n")
             wav_scp_f.write(utt_id + " " + dstc2_root + "/" + row[4] + "\n")
             utt2spk_f.write(utt_id + " " + speaker_id + "\n")

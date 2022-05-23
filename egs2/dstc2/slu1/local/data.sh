@@ -26,20 +26,25 @@ if [ $# -ne 0 ]; then
     exit 2
 fi
 
+mkdir -p ${DSTC2}
+if [ -z "${DSTC2}" ]; then
+    log "Fill the value of 'DSTC2' of db.sh"
+    exit 1
+fi
 
 if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
-    if [ ! -e "${PWD}/data" ]; then
-        echo "stage 1: Downloading data to ${PWD} this may take around 5 minutes please be patient"
-        python3 local/create_dataset.py
+    if [ ! -e "${DSTC2}/data/train.csv" ]; then
+        echo "stage 1: Downloading data to ${DSTC2} this may take around 5 minutes please be patient"
+        python3 local/create_dataset.py ${DSTC2}
     else
-        log "stage 1: ${PWD}/local/data is already existing. Skip data downloading"
+        log "stage 1: ${DSTC2}/data is already existing. Skip data downloading"
     fi
 fi
 
 if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
     log "stage 2: Data Preparation"
     mkdir -p data/{train,valid,test}
-    python3 local/data_prep.py ${PWD}
+    python3 local/data_prep.py ${DSTC2}
     for x in test valid train; do
         # remove hyphen from text files
         local/remove_hyphen.py data/${x}/text
